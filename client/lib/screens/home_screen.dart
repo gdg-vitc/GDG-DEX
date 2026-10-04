@@ -220,13 +220,13 @@ class HomeScreen extends StatelessWidget {
   Widget _buildTopBar(BuildContext context) {
     return Row(
       children: [
-        // Left: GDG Logo in circular card
+        // Left: GDG Logo in square card
         Container(
           width: 44,
           height: 44,
           decoration: BoxDecoration(
             color: Colors.white,
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: const [
               BoxShadow(
@@ -237,7 +237,10 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
           child: const Center(
-            child: GdgLogo(size: 22),
+            child: GdgLogo(
+              size: 32,
+              borderRadius: BorderRadius.all(Radius.circular(6)),
+            ),
           ),
         ),
         const SizedBox(width: 14),
@@ -257,7 +260,7 @@ class HomeScreen extends StatelessWidget {
           height: 44,
           decoration: BoxDecoration(
             color: Colors.white,
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: const [
               BoxShadow(
