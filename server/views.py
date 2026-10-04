@@ -28,9 +28,14 @@ async def login(form: forms.LoginForm):
 def connect_users(user_from, user_to):
     if user_from == user_to:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"message": "Cannot connect to self"})
-    DB_SESSION.add(Connection(user_from=user_from, user_to=user_to))
-    DB_SESSION.add(Connection(user_from=user_to, user_to=user_from))
-    DB_SESSION.commit()
+
+    try:
+        DB_SESSION.add(Connection(user_from=user_from, user_to=user_to))
+        DB_SESSION.add(Connection(user_from=user_to, user_to=user_from))
+        DB_SESSION.commit()
+    except Exception as e:
+        DB_SESSION.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"message": "Cannot connect already connected users"})
 
 @router.post('/connect/qr')
 async def connect_qr(form: forms.ConnectQRForm, user_id: int = Depends(get_user)):
