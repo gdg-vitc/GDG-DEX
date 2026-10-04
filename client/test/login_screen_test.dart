@@ -10,7 +10,7 @@ import 'package:client/widgets/gdg_logo.dart';
 
 void main() {
   setUp(() {
-    HttpHelper.baseUrl = 'https://sponge-romantic-pangolin.ngrok-free.app';
+    HttpHelper.baseUrl = 'https://gdg-dex.onrender.com';
     HttpHelper.clearToken();
     HttpHelper.enableLogging = false;
   });

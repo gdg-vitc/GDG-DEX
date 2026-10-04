@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Lightweight local CORS proxy for Flutter Web development.
-Forwards all requests to https://sponge-romantic-pangolin.ngrok-free.app
+Forwards all requests to https://gdg-dex.onrender.com
 and injects CORS headers so any web browser can connect without CORS issues.
 
 Usage:
@@ -17,7 +17,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import urllib.request
 import urllib.error
 
-TARGET_URL = "https://sponge-romantic-pangolin.ngrok-free.app"
+TARGET_URL = "https://gdg-dex.onrender.com"
 PORT = 8080
 
 class CorsProxyHandler(BaseHTTPRequestHandler):

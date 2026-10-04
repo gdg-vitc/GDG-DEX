@@ -10,7 +10,7 @@ import 'package:client/services/http_helper.dart';
 
 void main() {
   setUp(() {
-    HttpHelper.baseUrl = 'https://sponge-romantic-pangolin.ngrok-free.app';
+    HttpHelper.baseUrl = 'https://gdg-dex.onrender.com';
     HttpHelper.token = 'MOCK-TOKEN-XYZ';
     HttpHelper.enableLogging = false;
   });
@@ -85,7 +85,7 @@ void main() {
       expect(find.text('Rank #3'), findsOneWidget);
       expect(find.text('Dex Encounters'), findsOneWidget);
       expect(find.text('Next Milestone: Top 2'), findsOneWidget);
-      expect(find.text('Boost'), findsOneWidget);
+      expect(find.text('Scan'), findsOneWidget);
 
       // Club Encounters Feed: Charlie Day (Rank #4) from API
       expect(find.text('Club Encounters Feed'), findsOneWidget);

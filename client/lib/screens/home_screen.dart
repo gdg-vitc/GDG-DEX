@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../services/http_helper.dart';
+import '../widgets/gdg_logo.dart';
 import '../widgets/pokeball_icon.dart';
 import 'capture_scan_screen.dart';
 import 'leaderboard_screen.dart';
@@ -18,6 +19,7 @@ class HomeScreen extends StatelessWidget {
   final String? token;
   final String? role;
   final String? name;
+  final String? passkey;
 
   const HomeScreen({
     super.key,
@@ -26,6 +28,7 @@ class HomeScreen extends StatelessWidget {
     this.token,
     this.role,
     this.name,
+    this.passkey,
   });
 
   void _handleLogout(BuildContext context) {
@@ -35,11 +38,11 @@ class HomeScreen extends StatelessWidget {
     ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
-  void _copyTokenToClipboard(BuildContext context, String tokenToCopy) {
-    Clipboard.setData(ClipboardData(text: tokenToCopy));
+  void _copyPasskeyToClipboard(BuildContext context, String passkeyToCopy) {
+    Clipboard.setData(ClipboardData(text: passkeyToCopy));
     try {
       Fluttertoast.showToast(
-        msg: 'Trainer token copied to clipboard!',
+        msg: 'Trainer passkey copied to clipboard!',
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: const Color(0xFF10B981),
@@ -52,7 +55,7 @@ class HomeScreen extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Trainer token copied to clipboard!',
+          'Trainer passkey copied to clipboard!',
           style: GoogleFonts.inter(fontWeight: FontWeight.w500),
         ),
         backgroundColor: const Color(0xFF10B981),
@@ -60,6 +63,17 @@ class HomeScreen extends StatelessWidget {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  String _resolvePasskey() {
+    if (passkey != null && passkey!.trim().isNotEmpty) {
+      return passkey!.trim();
+    }
+    final httpPasskey = HttpHelper.passkey;
+    if (httpPasskey != null && httpPasskey.trim().isNotEmpty) {
+      return httpPasskey.trim();
+    }
+    return 'lgpvdlen';
   }
 
   String _resolveToken() {
@@ -144,6 +158,7 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final activePasskey = _resolvePasskey();
     final activeToken = _resolveToken();
     final trainerName = _getTrainerName();
     final trainerId = _getTrainerId();
@@ -173,13 +188,14 @@ class HomeScreen extends StatelessWidget {
                       _buildTopBar(context),
                       const SizedBox(height: 16),
 
-                      // Card 1: Trainer Profile + Token & QR Code Card
+                      // Card 1: Trainer Profile + Passkey & QR Code Card
                       _buildTrainerTokenCard(
                         context,
                         trainerName: trainerName,
                         trainerId: trainerId,
                         trainerRole: trainerRole,
-                        token: activeToken,
+                        passkey: activePasskey,
+                        qrToken: activeToken,
                       ),
                       const SizedBox(height: 18),
 
@@ -204,6 +220,38 @@ class HomeScreen extends StatelessWidget {
   Widget _buildTopBar(BuildContext context) {
     return Row(
       children: [
+        // Left: GDG Logo in circular card
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0A000000),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const Center(
+            child: GdgLogo(size: 22),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Text(
+          'GDGDEX',
+          style: GoogleFonts.outfit(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+            color: const Color(0xFF0F172A),
+          ),
+        ),
+        const Spacer(),
+        // Right: Logout Button
         Container(
           width: 44,
           height: 44,
@@ -222,21 +270,11 @@ class HomeScreen extends StatelessWidget {
           child: IconButton(
             tooltip: 'Logout',
             icon: const Icon(
-              Icons.arrow_back,
-              color: Color(0xFF0F766E),
+              Icons.logout_rounded,
+              color: Color(0xFFEF4444),
               size: 20,
             ),
             onPressed: () => _handleLogout(context),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Text(
-          'GDGDEX',
-          style: GoogleFonts.outfit(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
-            color: const Color(0xFF0F172A),
           ),
         ),
       ],
@@ -248,7 +286,8 @@ class HomeScreen extends StatelessWidget {
     required String trainerName,
     required String trainerRole,
     required String trainerId,
-    required String token,
+    required String passkey,
+    required String qrToken,
   }) {
     showModalBottomSheet(
       context: context,
@@ -357,7 +396,7 @@ class HomeScreen extends StatelessWidget {
                   ],
                 ),
                 child: QrImageView(
-                  data: token,
+                  data: qrToken,
                   version: QrVersions.auto,
                   size: 190.0,
                   padding: EdgeInsets.zero,
@@ -376,12 +415,12 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // Full Token Section (word-wrapped so no text gets cutoff)
+            // Passkey Section
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'FULL TRAINER TOKEN',
+                  'FULL TRAINER PASSKEY',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -405,24 +444,25 @@ class HomeScreen extends StatelessWidget {
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: SelectableText(
-                token,
+                passkey,
                 style: GoogleFonts.robotoMono(
-                  fontSize: 12.5,
+                  fontSize: 14,
                   color: const Color(0xFF0F766E),
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   height: 1.4,
+                  letterSpacing: 0.8,
                 ),
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // Copy Full Token Button
+            // Copy Passkey Button
             SizedBox(
               height: 48,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  _copyTokenToClipboard(context, token);
+                  _copyPasskeyToClipboard(context, passkey);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF26C28F),
@@ -433,7 +473,7 @@ class HomeScreen extends StatelessWidget {
                 ),
                 icon: const Icon(Icons.copy_rounded, size: 18),
                 label: Text(
-                  'Copy Full Token',
+                  'Copy Passkey',
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -453,7 +493,8 @@ class HomeScreen extends StatelessWidget {
     required String trainerName,
     required String trainerId,
     required String trainerRole,
-    required String token,
+    required String passkey,
+    required String qrToken,
   }) {
     return Container(
       width: double.infinity,
@@ -479,7 +520,8 @@ class HomeScreen extends StatelessWidget {
             trainerName: trainerName,
             trainerId: trainerId,
             trainerRole: trainerRole,
-            token: token,
+            passkey: passkey,
+            qrToken: qrToken,
           ),
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -557,7 +599,7 @@ class HomeScreen extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Inner Container: Token Box + QR Code
+                // Inner Container: Passkey Box + QR Code
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -567,7 +609,7 @@ class HomeScreen extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Left Column: TRAINER TOKEN header, token box, and helper text
+                      // Left Column: TRAINER PASSKEY header, passkey pill, and helper text
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -575,7 +617,7 @@ class HomeScreen extends StatelessWidget {
                             Row(
                               children: [
                                 Text(
-                                  'TRAINER TOKEN',
+                                  'TRAINER PASSKEY',
                                   style: GoogleFonts.inter(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
@@ -593,9 +635,9 @@ class HomeScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 8),
 
-                            // Interactive Token Pill
+                            // Interactive Passkey Pill
                             InkWell(
-                              onTap: () => _copyTokenToClipboard(context, token),
+                              onTap: () => _copyPasskeyToClipboard(context, passkey),
                               borderRadius: BorderRadius.circular(10),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -612,7 +654,7 @@ class HomeScreen extends StatelessWidget {
                                   children: [
                                     Flexible(
                                       child: Text(
-                                        token,
+                                        passkey,
                                         style: GoogleFonts.outfit(
                                           fontSize: 13.5,
                                           fontWeight: FontWeight.w800,
@@ -636,7 +678,7 @@ class HomeScreen extends StatelessWidget {
                             const SizedBox(height: 8),
 
                             Text(
-                              'Tap container to view full token & large QR',
+                              'Tap container to view passkey & large QR',
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 height: 1.3,
@@ -667,7 +709,7 @@ class HomeScreen extends StatelessWidget {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: QrImageView(
-                            data: token,
+                            data: qrToken,
                             version: QrVersions.auto,
                             size: 96.0,
                             padding: const EdgeInsets.all(2),

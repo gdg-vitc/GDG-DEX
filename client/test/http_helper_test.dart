@@ -74,4 +74,27 @@ void main() {
           .having((e) => e.message, 'message', equals('User not found'))),
     );
   });
+
+  test('ApiException extracts message from nested detail map (FastAPI format)', () async {
+    HttpHelper.client = MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'detail': {'message': 'Invalid email or registration number'}
+        }),
+        404,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    expect(
+      () => httpPost('/api/login', body: {'email': 'bad@example.com'}),
+      throwsA(isA<ApiException>()
+          .having((e) => e.statusCode, 'statusCode', equals(404))
+          .having(
+            (e) => e.message,
+            'message',
+            equals('Invalid email or registration number'),
+          )),
+    );
+  });
 }

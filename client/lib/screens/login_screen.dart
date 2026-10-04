@@ -146,6 +146,22 @@ class _LoginScreenState extends State<LoginScreen> {
         HttpHelper.userName = userName.trim();
       }
 
+      // Extract passkey if returned by backend API
+      String? userPasskey;
+      if (response is Map) {
+        final dynamic rawPasskey = response['passkey'] ??
+            (response['user'] is Map ? response['user']['passkey'] : null) ??
+            (response['trainer'] is Map ? response['trainer']['passkey'] : null) ??
+            (response['data'] is Map ? response['data']['passkey'] : null);
+        if (rawPasskey != null && rawPasskey.toString().trim().isNotEmpty) {
+          userPasskey = rawPasskey.toString().trim();
+        }
+      }
+
+      if (userPasskey != null && userPasskey.trim().isNotEmpty) {
+        HttpHelper.passkey = userPasskey.trim();
+      }
+
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -155,6 +171,7 @@ class _LoginScreenState extends State<LoginScreen> {
             token: sessionToken,
             role: userRole,
             name: userName,
+            passkey: userPasskey,
           ),
         ),
       );

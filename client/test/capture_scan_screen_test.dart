@@ -28,12 +28,12 @@ void main() {
       }
       return null;
     });
-    HttpHelper.baseUrl = 'https://sponge-romantic-pangolin.ngrok-free.app';
+    HttpHelper.baseUrl = 'https://gdg-dex.onrender.com';
     HttpHelper.token = 'dummy_token';
     HttpHelper.enableLogging = false;
   });
 
-  testWidgets('CaptureScanScreen renders title, laser viewfinder, paste and manual buttons', (tester) async {
+  testWidgets('CaptureScanScreen renders title, laser viewfinder, and manual entry button without clipboard/test buttons', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: CaptureScanScreen(),
@@ -44,9 +44,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Scan QR to Capture'), findsOneWidget);
-    expect(find.byKey(const Key('paste_capture_button')), findsOneWidget);
     expect(find.byKey(const Key('manual_entry_button')), findsOneWidget);
-    expect(find.byKey(const Key('simulate_capture_button')), findsOneWidget);
+    expect(find.text('Enter Details Manually'), findsOneWidget);
+    expect(find.byKey(const Key('paste_capture_button')), findsNothing);
+    expect(find.byKey(const Key('simulate_capture_button')), findsNothing);
   });
 
   testWidgets('Tapping manual entry button opens modal sheet with email, passkey and connect button', (tester) async {
@@ -111,65 +112,6 @@ void main() {
 
     expect(apiCalled, isTrue);
     expect(find.text('Captured!'), findsOneWidget);
-  });
-
-  testWidgets('QR capture sends POST /api/connect/qr with qr_data', (tester) async {
-    bool qrApiCalled = false;
-
-    HttpHelper.client = MockClient((request) async {
-      if (request.url.path == '/api/connect/qr' && request.method == 'POST') {
-        qrApiCalled = true;
-        final body = jsonDecode(request.body);
-        expect(body['qr_data'], equals('PKMN-SECRET-QR-123'));
-        expect(request.headers['Authorization'], equals('Bearer dummy_token'));
-
-        return http.Response(
-          jsonEncode({'message': 'Trainer connection captured successfully!'}),
-          200,
-          headers: {'content-type': 'application/json'},
-        );
-      }
-      return http.Response('Not found', 404);
-    });
-
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: CaptureScanScreen(),
-      ),
-    );
-
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    // Simulate paste / capture
-    mockClipboardText = 'PKMN-SECRET-QR-123';
-    await tester.tap(find.byKey(const Key('paste_capture_button')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
-
-    expect(qrApiCalled, isTrue);
-    expect(find.text('Captured!'), findsOneWidget);
-  });
-
-  testWidgets('Pasting from clipboard handles empty clipboard gracefully', (tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: CaptureScanScreen(),
-      ),
-    );
-
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    // Clear clipboard
-    mockClipboardText = '';
-
-    await tester.tap(find.byKey(const Key('paste_capture_button')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.text('Clipboard is empty or has no text'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 4));
   });
 
   testWidgets('Tapping back button in AppBar navigates back', (tester) async {

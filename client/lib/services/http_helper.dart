@@ -27,11 +27,12 @@ class ApiException implements Exception {
 class HttpHelper {
   static String baseUrl = const String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://sponge-romantic-pangolin.ngrok-free.app',
+    defaultValue: 'https://gdg-dex.onrender.com',
   );
   static String? token;
   static String? role;
   static String? userName;
+  static String? passkey;
 
   static Map<String, String> defaultHeaders = {
     'Content-Type': 'application/json',
@@ -51,6 +52,7 @@ class HttpHelper {
     token = null;
     role = null;
     userName = null;
+    passkey = null;
   }
 
   static Future<T> get<T>(
@@ -239,6 +241,10 @@ class HttpHelper {
               fromJson: fromJson,
             );
             return fallbackResult;
+          } on ApiException {
+            // The local proxy reached the backend, and the server responded with an error (e.g. 404 invalid credentials).
+            // Do NOT swallow this as a CORS error; rethrow the actual backend error message!
+            rethrow;
           } catch (_) {
             baseUrl = currentBaseUrl;
           }
@@ -351,29 +357,33 @@ class HttpHelper {
     }
 
     String errorMessage = 'Request failed with status ${response.statusCode}';
-    if (decodedData is Map<String, dynamic>) {
-      if (decodedData['detail'] is Map) {
-        final detailMap = decodedData['detail'] as Map;
-        errorMessage = detailMap['message']?.toString() ??
-            detailMap['msg']?.toString() ??
-            detailMap['error']?.toString() ??
-            detailMap.toString();
-      } else if (decodedData['detail'] is List && (decodedData['detail'] as List).isNotEmpty) {
-        final first = (decodedData['detail'] as List).first;
+    if (decodedData is Map) {
+      final detail = decodedData['detail'];
+      if (detail is Map) {
+        errorMessage = detail['message']?.toString() ??
+            detail['msg']?.toString() ??
+            detail['error']?.toString() ??
+            detail.toString();
+      } else if (detail is List && detail.isNotEmpty) {
+        final first = detail.first;
         if (first is Map && first['msg'] != null) {
           errorMessage = first['msg'].toString();
         } else {
           errorMessage = first.toString();
         }
+      } else if (detail != null && detail.toString().trim().isNotEmpty) {
+        errorMessage = detail.toString().trim();
       } else {
         errorMessage = decodedData['message']?.toString() ??
             decodedData['error']?.toString() ??
-            decodedData['detail']?.toString() ??
             decodedData['msg']?.toString() ??
+            decodedData['description']?.toString() ??
             errorMessage;
       }
-    } else if (decodedData is String && decodedData.length < 150) {
-      errorMessage = decodedData;
+    } else if (decodedData is String && decodedData.trim().isNotEmpty) {
+      if (decodedData.length < 250) {
+        errorMessage = decodedData.trim();
+      }
     }
 
     throw ApiException(

@@ -197,7 +197,7 @@ class _CaptureScanScreenState extends State<CaptureScanScreen>
         message = response['message'].toString();
       }
 
-      _showCaptureSuccessDialog(cleanQr, message);
+      _showCaptureSuccessDialog(message);
     } on ApiException catch (e) {
       _showToast(e.message);
     } catch (e) {
@@ -249,7 +249,7 @@ class _CaptureScanScreenState extends State<CaptureScanScreen>
         message = response['message'].toString();
       }
 
-      _showCaptureSuccessDialog('$cleanEmail ($cleanPasskey)', message);
+      _showCaptureSuccessDialog(message);
     } on ApiException catch (e) {
       _showToast(e.message);
     } catch (e) {
@@ -258,20 +258,6 @@ class _CaptureScanScreenState extends State<CaptureScanScreen>
       if (mounted) {
         setState(() => _isSubmitting = false);
       }
-    }
-  }
-
-  Future<void> _pasteFromClipboard() async {
-    try {
-      final data = await Clipboard.getData(Clipboard.kTextPlain);
-      final text = data?.text?.trim();
-      if (text == null || text.isEmpty) {
-        _showToast('Clipboard is empty or has no text');
-        return;
-      }
-      _submitQrData(text);
-    } catch (e) {
-      _showToast('Failed to read clipboard: $e');
     }
   }
 
@@ -295,7 +281,7 @@ class _CaptureScanScreenState extends State<CaptureScanScreen>
     }
   }
 
-  void _showCaptureSuccessDialog(String details, String message) {
+  void _showCaptureSuccessDialog(String message, {String? details}) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -336,24 +322,26 @@ class _CaptureScanScreenState extends State<CaptureScanScreen>
                 color: const Color(0xFF475569),
               ),
             ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                details,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF64748B),
+            if (details != null && details.trim().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                child: Text(
+                  details,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF64748B),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -630,11 +618,6 @@ class _CaptureScanScreenState extends State<CaptureScanScreen>
                 onPressed: _switchCamera,
               ),
             ],
-            IconButton(
-              tooltip: 'Paste from clipboard',
-              icon: const Icon(Icons.content_paste_rounded, color: Colors.white70),
-              onPressed: _pasteFromClipboard,
-            ),
             const SizedBox(width: 8),
           ],
         ),
@@ -783,76 +766,31 @@ class _CaptureScanScreenState extends State<CaptureScanScreen>
 
               const SizedBox(height: 16),
 
-              // Action Buttons at bottom
+              // Action Button at bottom: Enter Manually
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: Column(
-                  children: [
-                    // Paste from Clipboard & Capture Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton.icon(
-                        key: const Key('paste_capture_button'),
-                        onPressed: _isSubmitting ? null : _pasteFromClipboard,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF26C28F),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        icon: const Icon(Icons.content_paste_rounded, size: 20),
-                        label: Text(
-                          'Paste from Clipboard & Capture',
-                          style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14.5,
-                          ),
-                        ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    key: const Key('manual_entry_button'),
+                    onPressed: _isSubmitting ? null : _showManualEntrySheet,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF26C28F),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-
-                    const SizedBox(height: 10),
-
-                    // Manual Entry Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        TextButton.icon(
-                          key: const Key('manual_entry_button'),
-                          onPressed: _isSubmitting ? null : _showManualEntrySheet,
-                          icon: const Icon(Icons.keyboard_outlined, color: Colors.white70, size: 18),
-                          label: Text(
-                            'Enter manually',
-                            style: GoogleFonts.inter(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13.5,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text('•', style: TextStyle(color: Colors.white.withValues(alpha: 0.3))),
-                        const SizedBox(width: 8),
-                        TextButton.icon(
-                          key: const Key('simulate_capture_button'),
-                          onPressed: _isSubmitting
-                              ? null
-                              : () => _submitQrData('PKMN-TEST-${DateTime.now().millisecondsSinceEpoch % 10000}'),
-                          icon: const PokeballIcon(size: 16),
-                          label: Text(
-                            'Test capture',
-                            style: GoogleFonts.inter(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13.5,
-                            ),
-                          ),
-                        ),
-                      ],
+                    icon: const Icon(Icons.keyboard_outlined, size: 20),
+                    label: Text(
+                      'Enter Details Manually',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14.5,
+                      ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ],

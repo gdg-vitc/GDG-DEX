@@ -7,6 +7,7 @@ import 'package:client/screens/home_screen.dart';
 import 'package:client/screens/leaderboard_screen.dart';
 import 'package:client/screens/login_screen.dart';
 import 'package:client/services/http_helper.dart';
+import 'package:client/widgets/gdg_logo.dart';
 import 'package:client/widgets/pokeball_icon.dart';
 
 void main() {
@@ -30,13 +31,14 @@ void main() {
       }
       return null;
     });
-    HttpHelper.baseUrl = 'https://sponge-romantic-pangolin.ngrok-free.app';
+    HttpHelper.baseUrl = 'https://gdg-dex.onrender.com';
     HttpHelper.token = 'PKMN-7749-X9';
+    HttpHelper.passkey = 'lgpvdlen';
     HttpHelper.enableLogging = false;
   });
 
   testWidgets(
-    'HomeScreen renders GDGDEX header, trainer card, dynamic token, and QR code',
+    'HomeScreen renders GDGDEX header, trainer card, dynamic passkey, and QR code',
     (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -44,21 +46,24 @@ void main() {
             email: 'ash@kanto.org',
             regNo: 'STU-08429',
             token: 'PKMN-7749-X9',
+            passkey: 'lgpvdlen',
           ),
         ),
       );
 
-      // Header
+      // Header: GDG Logo, title, and logout button
+      expect(find.byType(GdgLogo), findsOneWidget);
       expect(find.text('GDGDEX'), findsOneWidget);
+      expect(find.byTooltip('Logout'), findsOneWidget);
 
       // Trainer Profile
       expect(find.text('Trainer Ash'), findsOneWidget);
       expect(find.text('Kanto Club'), findsOneWidget);
       expect(find.text('ID: STU-08429'), findsOneWidget);
 
-      // Token Section
-      expect(find.text('TRAINER TOKEN'), findsOneWidget);
-      expect(find.text('PKMN-7749-X9'), findsOneWidget);
+      // Passkey Section (only passkey is visible to user)
+      expect(find.text('TRAINER PASSKEY'), findsOneWidget);
+      expect(find.text('lgpvdlen'), findsOneWidget);
 
       // QR Code with token inside
       expect(find.byType(QrImageView), findsOneWidget);
@@ -136,25 +141,25 @@ void main() {
     },
   );
 
-  testWidgets('Tapping token copies it to clipboard and shows feedback', (
+  testWidgets('Tapping passkey copies it to clipboard and shows feedback', (
     tester,
   ) async {
     await tester.pumpWidget(
-      const MaterialApp(home: HomeScreen(token: 'TEST-TOKEN-42')),
+      const MaterialApp(home: HomeScreen(passkey: 'lgpvdlen')),
     );
 
-    await tester.tap(find.text('TEST-TOKEN-42'));
+    await tester.tap(find.text('lgpvdlen'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
     final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-    expect(clipboardData?.text, equals('TEST-TOKEN-42'));
-    expect(find.text('Trainer token copied to clipboard!'), findsOneWidget);
+    expect(clipboardData?.text, equals('lgpvdlen'));
+    expect(find.text('Trainer passkey copied to clipboard!'), findsOneWidget);
     await tester.pump(const Duration(seconds: 4));
   });
 
   testWidgets(
-    'Tapping trainer container opens modal with full unclipped token and large QR code',
+    'Tapping trainer container opens modal with full passkey and large QR code',
     (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -162,7 +167,8 @@ void main() {
             name: 'Bob Iyer',
             role: 'Tech Lead',
             regNo: '23BCE0002',
-            token: 'FULL-UNCLIPPED-TRAINER-TOKEN-VALUE-12345',
+            token: 'MODAL-QR-TOKEN-VALUE',
+            passkey: 'lgpvdlen',
           ),
         ),
       );
@@ -171,15 +177,19 @@ void main() {
       await tester.tap(find.byKey(const Key('trainer_token_card')));
       await tester.pumpAndSettle();
 
-      // Modal elements should be visible
-      expect(find.text('FULL TRAINER TOKEN'), findsOneWidget);
-      expect(find.text('Copy Full Token'), findsOneWidget);
+      // Modal elements should be visible - only passkey is visible to user
+      expect(find.text('FULL TRAINER PASSKEY'), findsOneWidget);
+      expect(find.text('Copy Passkey'), findsOneWidget);
       expect(
-        find.text('FULL-UNCLIPPED-TRAINER-TOKEN-VALUE-12345'),
+        find.text('lgpvdlen'),
         findsNWidgets(2),
       );
+      expect(find.text('MODAL-QR-TOKEN-VALUE'), findsNothing);
       expect(find.text('Tech Lead'), findsNWidgets(2));
       expect(find.text('ID: 23BCE0002'), findsNWidgets(2));
+
+      // QR Code encodes token and is rendered in both card and modal
+      expect(find.byType(QrImageView), findsNWidgets(2));
     },
   );
 }
