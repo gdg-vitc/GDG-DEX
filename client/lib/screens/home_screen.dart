@@ -929,7 +929,14 @@ class HomeScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+              MaterialPageRoute(
+                builder: (_) => LeaderboardScreen(
+                  currentUserName: _getTrainerName(),
+                  currentUserRole: _resolveRole(),
+                  currentUserRegNo: regNo,
+                  currentUserEmail: email,
+                ),
+              ),
             );
           },
           child: ClipRRect(

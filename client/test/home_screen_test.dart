@@ -118,7 +118,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(LeaderboardScreen), findsOneWidget);
-    expect(find.text('Club Leaderboard'), findsOneWidget);
+    expect(find.text('Leaderboard'), findsOneWidget);
   });
 
   testWidgets(
