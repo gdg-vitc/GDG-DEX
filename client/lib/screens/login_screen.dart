@@ -86,13 +86,65 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       // Save token if returned by backend
-      if (response is Map && response['token'] != null) {
-        HttpHelper.setToken(response['token'].toString());
-      } else if (response is Map && response['access_token'] != null) {
-        HttpHelper.setToken(response['access_token'].toString());
+      if (response is Map) {
+        final dynamic rawToken = response['token'] ??
+            response['access_token'] ??
+            response['jwt'] ??
+            response['session_token'] ??
+            (response['data'] is Map ? (response['data']['token'] ?? response['data']['access_token']) : null);
+        if (rawToken != null && rawToken.toString().trim().isNotEmpty) {
+          HttpHelper.setToken(rawToken.toString().trim());
+        }
       }
 
       final sessionToken = HttpHelper.token;
+
+      // Extract role if returned by backend API
+      String? userRole;
+      if (response is Map) {
+        final dynamic rawRole = response['role'] ??
+            response['club_role'] ??
+            response['user_role'] ??
+            response['member_role'] ??
+            response['role_name'] ??
+            (response['user'] is Map ? response['user']['role'] : null) ??
+            (response['trainer'] is Map ? response['trainer']['role'] : null) ??
+            (response['data'] is Map ? response['data']['role'] : null) ??
+            response['club'] ??
+            response['designation'] ??
+            response['position'];
+
+        if (rawRole is List && rawRole.isNotEmpty) {
+          userRole = rawRole.first?.toString().trim();
+        } else if (rawRole != null) {
+          userRole = rawRole.toString().trim();
+        }
+      }
+
+      // If role wasn't directly in response JSON, check if token contains role claims
+      if ((userRole == null || userRole.isEmpty) && sessionToken != null) {
+        userRole = HomeScreen.extractRoleFromJwt(sessionToken);
+      }
+
+      if (userRole != null && userRole.trim().isNotEmpty) {
+        HttpHelper.role = userRole.trim();
+      }
+
+      // Extract user name if returned by backend API
+      String? userName;
+      if (response is Map) {
+        final dynamic rawName = response['name'] ??
+            (response['user'] is Map ? response['user']['name'] : null) ??
+            (response['trainer'] is Map ? response['trainer']['name'] : null) ??
+            (response['data'] is Map ? response['data']['name'] : null);
+        if (rawName != null && rawName.toString().trim().isNotEmpty) {
+          userName = rawName.toString().trim();
+        }
+      }
+
+      if (userName != null && userName.trim().isNotEmpty) {
+        HttpHelper.userName = userName.trim();
+      }
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -101,6 +153,8 @@ class _LoginScreenState extends State<LoginScreen> {
             email: email,
             regNo: regNo,
             token: sessionToken,
+            role: userRole,
+            name: userName,
           ),
         ),
       );

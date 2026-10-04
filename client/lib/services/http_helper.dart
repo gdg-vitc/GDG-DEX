@@ -25,8 +25,13 @@ class ApiException implements Exception {
 }
 
 class HttpHelper {
-  static String baseUrl = 'https://sponge-romantic-pangolin.ngrok-free.app';
+  static String baseUrl = const String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://sponge-romantic-pangolin.ngrok-free.app',
+  );
   static String? token;
+  static String? role;
+  static String? userName;
 
   static Map<String, String> defaultHeaders = {
     'Content-Type': 'application/json',
@@ -44,6 +49,8 @@ class HttpHelper {
 
   static void clearToken() {
     token = null;
+    role = null;
+    userName = null;
   }
 
   static Future<T> get<T>(
@@ -216,6 +223,34 @@ class HttpHelper {
       if (e is ApiException) rethrow;
 
       final errorStr = e.toString().toLowerCase();
+      if (kIsWeb && (e is http.ClientException || errorStr.contains('xmlhttprequest') || errorStr.contains('cors'))) {
+        final currentBaseUrl = baseUrl;
+        if (!currentBaseUrl.contains('localhost:8080') && !currentBaseUrl.contains('127.0.0.1:8080')) {
+          try {
+            baseUrl = 'http://localhost:8080';
+            final fallbackResult = await request<T>(
+              method,
+              path,
+              body: body,
+              queryParams: queryParams,
+              headers: headers,
+              token: token,
+              customTimeout: customTimeout,
+              fromJson: fromJson,
+            );
+            return fallbackResult;
+          } catch (_) {
+            baseUrl = currentBaseUrl;
+          }
+        }
+
+        throw ApiException(
+          message: 'Connection blocked by browser (CORS). The FastAPI server needs CORSMiddleware enabled, or run Chrome with --disable-web-security.',
+          statusCode: null,
+          uri: uri,
+        );
+      }
+
       if (errorStr.contains('socketexception') ||
           errorStr.contains('connection refused') ||
           errorStr.contains('failed host lookup') ||

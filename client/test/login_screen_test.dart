@@ -110,4 +110,64 @@ void main() {
 
     expect(find.text('value is not a valid email address'), findsAtLeastNWidgets(1));
   });
+
+  testWidgets('LoginScreen extracts role from login API response and passes it to HomeScreen', (tester) async {
+    HttpHelper.client = MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'token': 'jwt_secret_token_123',
+          'role': 'General Secretary',
+          'message': 'Welcome!'
+        }),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: LoginScreen(),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField).at(0), 'alex@campus.edu');
+    await tester.enterText(find.byType(TextField).at(1), 'STU-08429');
+
+    await tester.tap(find.text('Enter Club Pokédex'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(HttpHelper.role, equals('General Secretary'));
+    expect(find.text('General Secretary'), findsOneWidget);
+  });
+
+  testWidgets('LoginScreen decodes role from JWT when not in response body', (tester) async {
+    final header = base64Url.encode(utf8.encode('{"alg":"HS256","typ":"JWT"}')).replaceAll('=', '');
+    final payload = base64Url.encode(utf8.encode('{"sub":"alex","role":"Core Member"}')).replaceAll('=', '');
+    final jwt = '$header.$payload.fake_signature';
+
+    HttpHelper.client = MockClient((request) async {
+      return http.Response(
+        jsonEncode({'token': jwt, 'message': 'Welcome!'}),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: LoginScreen(),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField).at(0), 'alex@campus.edu');
+    await tester.enterText(find.byType(TextField).at(1), 'STU-08429');
+
+    await tester.tap(find.text('Enter Club Pokédex'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(HttpHelper.role, equals('Core Member'));
+    expect(find.text('Core Member'), findsOneWidget);
+  });
 }

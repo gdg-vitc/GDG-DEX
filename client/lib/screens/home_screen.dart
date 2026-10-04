@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+
 import '../services/http_helper.dart';
 import '../widgets/pokeball_icon.dart';
 import 'capture_scan_screen.dart';
@@ -13,19 +16,23 @@ class HomeScreen extends StatelessWidget {
   final String? email;
   final String? regNo;
   final String? token;
+  final String? role;
+  final String? name;
 
   const HomeScreen({
     super.key,
     this.email,
     this.regNo,
     this.token,
+    this.role,
+    this.name,
   });
 
   void _handleLogout(BuildContext context) {
     HttpHelper.clearToken();
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   void _copyTokenToClipboard(BuildContext context, String tokenToCopy) {
@@ -67,6 +74,12 @@ class HomeScreen extends StatelessWidget {
   }
 
   String _getTrainerName() {
+    if (name != null && name!.trim().isNotEmpty) {
+      return name!.trim();
+    }
+    if (HttpHelper.userName != null && HttpHelper.userName!.trim().isNotEmpty) {
+      return HttpHelper.userName!.trim();
+    }
     if (email != null && email!.trim().isNotEmpty) {
       final namePart = email!.trim().split('@').first;
       if (namePart.isNotEmpty) {
@@ -84,11 +97,57 @@ class HomeScreen extends StatelessWidget {
     return 'ID: STU-08429';
   }
 
+  String _resolveRole() {
+    if (role != null && role!.trim().isNotEmpty) {
+      return role!.trim();
+    }
+    if (HttpHelper.role != null && HttpHelper.role!.trim().isNotEmpty) {
+      return HttpHelper.role!.trim();
+    }
+    final jwtRole = extractRoleFromJwt(token ?? HttpHelper.token);
+    if (jwtRole != null && jwtRole.isNotEmpty) {
+      return jwtRole;
+    }
+    return 'Kanto Club';
+  }
+
+  static String? extractRoleFromJwt(String? rawToken) {
+    if (rawToken == null) return null;
+    final parts = rawToken.split('.');
+    if (parts.length != 3) return null;
+    try {
+      final normalized = base64Url.normalize(parts[1]);
+      final payloadString = utf8.decode(base64Url.decode(normalized));
+      final payload = jsonDecode(payloadString);
+      if (payload is Map) {
+        final dynamic val =
+            payload['role'] ??
+            payload['club_role'] ??
+            payload['user_role'] ??
+            payload['member_role'] ??
+            payload['role_name'] ??
+            payload['designation'] ??
+            payload['position'] ??
+            payload['club'] ??
+            (payload['user'] is Map ? payload['user']['role'] : null) ??
+            (payload['data'] is Map ? payload['data']['role'] : null);
+        if (val is List && val.isNotEmpty) {
+          final first = val.first?.toString().trim();
+          if (first != null && first.isNotEmpty) return first;
+        } else if (val != null && val.toString().trim().isNotEmpty) {
+          return val.toString().trim();
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeToken = _resolveToken();
     final trainerName = _getTrainerName();
     final trainerId = _getTrainerId();
+    final trainerRole = _resolveRole();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAF8),
@@ -97,13 +156,14 @@ class HomeScreen extends StatelessWidget {
           children: [
             // Soft organic background curves matching the mockup
             Positioned.fill(
-              child: CustomPaint(
-                painter: _BackgroundCurvesPainter(),
-              ),
+              child: CustomPaint(painter: _BackgroundCurvesPainter()),
             ),
             Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 420),
                   child: Column(
@@ -118,6 +178,7 @@ class HomeScreen extends StatelessWidget {
                         context,
                         trainerName: trainerName,
                         trainerId: trainerId,
+                        trainerRole: trainerRole,
                         token: activeToken,
                       ),
                       const SizedBox(height: 18),
@@ -160,13 +221,17 @@ class HomeScreen extends StatelessWidget {
           ),
           child: IconButton(
             tooltip: 'Logout',
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF0F766E), size: 20),
+            icon: const Icon(
+              Icons.arrow_back,
+              color: Color(0xFF0F766E),
+              size: 20,
+            ),
             onPressed: () => _handleLogout(context),
           ),
         ),
         const SizedBox(width: 14),
         Text(
-          'Pokédex',
+          'GDGDEX',
           style: GoogleFonts.outfit(
             fontSize: 28,
             fontWeight: FontWeight.w800,
@@ -178,15 +243,220 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  void _showTrainerDetailsModal(
+    BuildContext context, {
+    required String trainerName,
+    required String trainerRole,
+    required String trainerId,
+    required String token,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Drag indicator handle
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Header: Avatar, Name & Role, ID
+            Row(
+              children: [
+                _buildTrainerAvatar(trainerName: trainerName),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              trainerName,
+                              style: GoogleFonts.outfit(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 3.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE6F7F2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              trainerRole,
+                              style: GoogleFonts.inter(
+                                color: const Color(0xFF0D9488),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        trainerId,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // Large Scannable QR Code (pure basic QR without pokemon logo)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x0A000000),
+                      blurRadius: 16,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: QrImageView(
+                  data: token,
+                  version: QrVersions.auto,
+                  size: 190.0,
+                  padding: EdgeInsets.zero,
+                  backgroundColor: Colors.white,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square,
+                    color: Color(0xFF0F172A),
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Full Token Section (word-wrapped so no text gets cutoff)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'FULL TRAINER TOKEN',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                    color: const Color(0xFF475569),
+                  ),
+                ),
+                const Icon(
+                  Icons.shield_outlined,
+                  size: 14,
+                  color: Color(0xFF0D9488),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: SelectableText(
+                token,
+                style: GoogleFonts.robotoMono(
+                  fontSize: 12.5,
+                  color: const Color(0xFF0F766E),
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Copy Full Token Button
+            SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  _copyTokenToClipboard(context, token);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF26C28F),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                icon: const Icon(Icons.copy_rounded, size: 18),
+                label: Text(
+                  'Copy Full Token',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTrainerTokenCard(
     BuildContext context, {
     required String trainerName,
     required String trainerId,
+    required String trainerRole,
     required String token,
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(26),
@@ -198,285 +468,272 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Row: Avatar + Trainer Info
-          Row(
-            children: [
-              _buildTrainerAvatar(),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            trainerName,
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF0F172A),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE6F7F2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            'Kanto Club',
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFF0D9488),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      trainerId,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(26),
+        child: InkWell(
+          key: const Key('trainer_token_card'),
+          borderRadius: BorderRadius.circular(26),
+          onTap: () => _showTrainerDetailsModal(
+            context,
+            trainerName: trainerName,
+            trainerId: trainerId,
+            trainerRole: trainerRole,
+            token: token,
           ),
-
-          const SizedBox(height: 16),
-
-          // Inner Container: Token Box + QR Code
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF3F8),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left Column: TRAINER TOKEN header, token box, and helper text
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                // Top Row: Avatar + Trainer Info
+                Row(
+                  children: [
+                    _buildTrainerAvatar(trainerName: trainerName),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'TRAINER TOKEN',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                              color: const Color(0xFF334155),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.shield_outlined,
-                            size: 13,
-                            color: Color(0xFF0D9488),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Interactive Token Pill
-                      InkWell(
-                        onTap: () => _copyTokenToClipboard(context, token),
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          Row(
                             children: [
                               Flexible(
                                 child: Text(
-                                  token,
+                                  trainerName,
                                   style: GoogleFonts.outfit(
-                                    fontSize: 13.5,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF0F766E),
-                                    letterSpacing: 0.6,
+                                    color: const Color(0xFF0F172A),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              const Icon(
-                                Icons.copy_rounded,
-                                size: 14,
-                                color: Color(0xFF64748B),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                fit: FlexFit.loose,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE6F7F2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    trainerRole,
+                                    style: GoogleFonts.inter(
+                                      color: const Color(0xFF0D9488),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      Text(
-                        'Show QR code to fellow trainers to initiate meetup encounter',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          height: 1.3,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(width: 12),
-
-                // Right: Generated QR Code with just the token inside it
-                Container(
-                  padding: const EdgeInsets.all(5),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x06000000),
-                        blurRadius: 6,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: QrImageView(
-                      data: token,
-                      version: QrVersions.auto,
-                      size: 78.0,
-                      padding: const EdgeInsets.all(3),
-                      backgroundColor: Colors.white,
-                      eyeStyle: const QrEyeStyle(
-                        eyeShape: QrEyeShape.square,
-                        color: Color(0xFF0F172A),
-                      ),
-                      dataModuleStyle: const QrDataModuleStyle(
-                        dataModuleShape: QrDataModuleShape.square,
-                        color: Color(0xFF0F172A),
+                          const SizedBox(height: 3),
+                          Text(
+                            trainerId,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    const Icon(
+                      Icons.fullscreen_rounded,
+                      color: Color(0xFF94A3B8),
+                      size: 22,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Inner Container: Token Box + QR Code
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF3F8),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Left Column: TRAINER TOKEN header, token box, and helper text
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'TRAINER TOKEN',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                    color: const Color(0xFF334155),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.shield_outlined,
+                                  size: 13,
+                                  color: Color(0xFF0D9488),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Interactive Token Pill
+                            InkWell(
+                              onTap: () => _copyTokenToClipboard(context, token),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        token,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFF0F766E),
+                                          letterSpacing: 0.6,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Icon(
+                                      Icons.copy_rounded,
+                                      size: 14,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            Text(
+                              'Tap container to view full token & large QR',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                height: 1.3,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      // Right: Bigger basic QR Code without any center logo
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x06000000),
+                              blurRadius: 6,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: QrImageView(
+                            data: token,
+                            version: QrVersions.auto,
+                            size: 96.0,
+                            padding: const EdgeInsets.all(2),
+                            backgroundColor: Colors.white,
+                            eyeStyle: const QrEyeStyle(
+                              eyeShape: QrEyeShape.square,
+                              color: Color(0xFF0F172A),
+                            ),
+                            dataModuleStyle: const QrDataModuleStyle(
+                              dataModuleShape: QrDataModuleShape.square,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildTrainerAvatar() {
-    return Stack(
-      alignment: Alignment.bottomCenter,
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            color: Colors.white,
+  Widget _buildTrainerAvatar({String? trainerName}) {
+    final initial = (trainerName != null && trainerName.trim().isNotEmpty)
+        ? trainerName.trim().replaceAll('Trainer ', '').trim().characters.first.toUpperCase()
+        : 'T';
+
+    return Container(
+      width: 54,
+      height: 54,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFF2DD4BF), width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2DD4BF).withValues(alpha: 0.25),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: const BoxDecoration(
+            color: Color(0xFFE6F7F2),
             shape: BoxShape.circle,
-            border: Border.all(
-              color: const Color(0xFF2DD4BF),
-              width: 3.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF2DD4BF).withValues(alpha: 0.25),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
           child: Center(
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.35),
-                  width: 1.5,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '20',
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      height: 1.0,
-                      fontWeight: FontWeight.w900,
-                      color: const Color(0xFF0D9488),
-                    ),
-                  ),
-                  Text(
-                    'MP',
-                    style: GoogleFonts.inter(
-                      fontSize: 7.5,
-                      height: 1.0,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0D9488),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: -6,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: const Color(0xFF065F46),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x33000000),
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
             child: Text(
-              'Lv.14',
-              style: GoogleFonts.inter(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
+              initial,
+              style: GoogleFonts.outfit(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0D9488),
               ),
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 
@@ -558,7 +815,10 @@ class HomeScreen extends StatelessWidget {
                           children: [
                             // Badge
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.25),
                                 borderRadius: BorderRadius.circular(20),
@@ -570,7 +830,9 @@ class HomeScreen extends StatelessWidget {
                                     width: 7,
                                     height: 7,
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.7),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.7,
+                                      ),
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -631,7 +893,9 @@ class HomeScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 100), // Reserve clear space for Pokéball on right
+                      const SizedBox(
+                        width: 100,
+                      ), // Reserve clear space for Pokéball on right
                     ],
                   ),
                 ),
@@ -689,7 +953,8 @@ class HomeScreen extends StatelessWidget {
                             height: 130,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: const Color(0xFFFEE2E2).withValues(alpha: 0.6),
+                              color: const Color(0xFFFEE2E2)
+                                  .withValues(alpha: 0.6),
                             ),
                           ),
                           Container(
@@ -717,7 +982,10 @@ class HomeScreen extends StatelessWidget {
                           children: [
                             // Badge
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFEE2E2),
                                 borderRadius: BorderRadius.circular(20),
@@ -777,7 +1045,9 @@ class HomeScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 80), // Reserve clear space for peach circles on right
+                      const SizedBox(
+                        width: 80,
+                      ), // Reserve clear space for peach circles on right
                     ],
                   ),
                 ),
