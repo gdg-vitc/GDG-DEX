@@ -1,0 +1,20 @@
+name: gdgdex
+services:
+  server:
+    image: python:3.12-alpine
+    volumes:
+      - ./server:/app
+    working_dir: /app
+    ports:
+      - "8000:8000"
+    command: ["sh", "-c", "pip install -r requirements.txt && fastapi dev main.py --host 0.0.0.0 --port 8000"]
+    environment:
+      - SECRET_KEY=your_secret_key
+      - DATABASE_URL=postgresql://gdgdex:gdgdex@db:5432/gdgdex
+
+  db:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_DB=gdgdex
+      - POSTGRES_USER=gdgdex
+      - POSTGRES_PASSWORD=gdgdex
